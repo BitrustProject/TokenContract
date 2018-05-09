@@ -31,11 +31,24 @@ contract ttest
     function testMint() public
     {
         uint oldb = token.balanceOf(this);
-        token.mintToken(this, 100 ether);
+        token.mintToken(this, 100 ether, 0);
         uint newb = token.balanceOf(this);
         
         emit LogUint(oldb);
         emit LogUint(newb);
         assert((newb - oldb) == 100 ether);
+    }
+    
+    function testMintLockup() public
+    {
+        uint oldb = token.balanceOf(this);
+        token.mintToken(this, 100 ether, 1);
+        token.mintToken(this, 100 ether, 2);
+        token.mintToken(this, 100 ether, 3);
+        uint newb = token.balanceOf(this);
+        
+ 
+        assert((newb - oldb) == 300 ether);
+        assert(token.getFrozenBalance(this) == 300 ether);
     }
 }
