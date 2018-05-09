@@ -1,4 +1,4 @@
-pragma solidity ^0.4.16;
+pragma solidity ^0.4.23;
 
 contract owned {
     address public owner;
@@ -17,41 +17,35 @@ contract owned {
     }
 }
 
-interface tokenRecipient { function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public; }
-
 contract TokenERC20 {
     // Public variables of the token
     string public name;
     string public symbol;
     uint8 public decimals = 18;
     // 18 decimals is the strongly suggested default, avoid changing it
-    uint256 public minedTotalSupply;
-	uint256 public supplyCap; 
+	uint256 public tokenSupplyCap; 
     // This creates an array with all balances
     mapping (address => uint256) public balanceOf;
     mapping (address => mapping (address => uint256)) public allowance;
 
     // This generates a public event on the blockchain that will notify clients
     event Transfer(address indexed from, address indexed to, uint256 value);
-
-    // This notifies clients about the amount burnt
-    event Burn(address indexed from, uint256 value);
-
+    event Approved(address sender, address spender, uint amount);
     /**
      * Constrctor function
      *
      * Initializes contract with initial supply tokens to the creator of the contract
      */
     function TokenERC20(
-        uint256 initialSupply,
+        uint256 totalSupply,
         string tokenName,
         string tokenSymbol
     ) public {
-        minedTotalSupply = initialSupply * 10 ** uint256(decimals);  // Update total supply with the decimal amount
-		supplyCap = 100000000 * 10 ** uint256(decimals);//supplycap is 100 million;
-		balanceOf[msg.sender] = minedTotalSupply;          //half supply assign to team development;
-        name = tokenName;                                   // Set the name for display purposes
-        symbol = tokenSymbol;                               // Set the symbol for display purposes
+        
+		tokenSupplyCap = totalSupply * 10 ** uint256(decimals);//supplycap is 100 million;
+		balanceOf[this] = tokenSupplyCap;          //half supply assign to token contract;
+        name = tokenName;                          // Set the name for display purposes
+        symbol = tokenSymbol;                      // Set the symbol for display purposes
     }
 
     /**
@@ -70,7 +64,7 @@ contract TokenERC20 {
         balanceOf[_from] -= _value;
         // Add the same to the recipient
         balanceOf[_to] += _value;
-        Transfer(_from, _to, _value);
+        emit Transfer(_from, _to, _value);
         // Asserts are used to use static analysis to find bugs in your code. They should never fail
         assert(balanceOf[_from] + balanceOf[_to] == previousBalances);
     }
@@ -113,28 +107,13 @@ contract TokenERC20 {
      */
     function approve(address _spender, uint256 _value) public
         returns (bool success) {
+        require(balanceOf[msg.sender] > _value);
         allowance[msg.sender][_spender] = _value;
+        emit Approved(msg.sender, _spender, _value);
         return true;
     }
 
-    /**
-     * Set allowance for other address and notify
-     *
-     * Allows `_spender` to spend no more than `_value` tokens in your behalf, and then ping the contract about it
-     *
-     * @param _spender The address authorized to spend
-     * @param _value the max amount they can spend
-     * @param _extraData some extra information to send to the approved contract
-     */
-    function approveAndCall(address _spender, uint256 _value, bytes _extraData)
-        public
-        returns (bool success) {
-        tokenRecipient spender = tokenRecipient(_spender);
-        if (approve(_spender, _value)) {
-            spender.receiveApproval(msg.sender, _value, this, _extraData);
-            return true;
-        }
-    }
+  
 
     /**
      * Destroy tokens
@@ -143,14 +122,15 @@ contract TokenERC20 {
      *
      * @param _value the amount of money to burn
      */
+     /**
     function burn(uint256 _value) public returns (bool success) {
         require(balanceOf[msg.sender] >= _value);   // Check if the sender has enough
         balanceOf[msg.sender] -= _value;            // Subtract from the sender
-        minedTotalSupply -= _value;                      // Updates minedTotalSupply
+        tokenSupplyCap -= _value;                      // Updates tokenSupplyCap
         Burn(msg.sender, _value);
         return true;
     }
-
+*/
     /**
      * Destroy tokens from other account
      *
@@ -159,15 +139,17 @@ contract TokenERC20 {
      * @param _from the address of the sender
      * @param _value the amount of money to burn
      */
+     /**
     function burnFrom(address _from, uint256 _value) public returns (bool success) {
         require(balanceOf[_from] >= _value);                // Check if the targeted balance is enough
         require(_value <= allowance[_from][msg.sender]);    // Check allowance
         balanceOf[_from] -= _value;                         // Subtract from the targeted balance
         allowance[_from][msg.sender] -= _value;             // Subtract from the sender's allowance
-        minedTotalSupply -= _value;                              // Update minedTotalSupply
+        tokenSupplyCap -= _value;                              // Update tokenSupplyCap
         Burn(_from, _value);
         return true;
     }
+    */
 }
 
 /******************************************/
@@ -183,35 +165,52 @@ contract BiTrustToken is owned, TokenERC20 {
         string tokenSymbol
     ) TokenERC20(initialSupply, tokenName, tokenSymbol) public 
 	{
+		buyPricePercent = 1;// 1% qtum or ether
+		sellPricePercent = 1; //1% qtum or ether
 	}
+    uint256 public sellPricePercent;
+    uint256 public buyPricePercent;
+	uint  launchTimeStamp = now;
 
-    /* Internal transfer, only can be called by this contract */
-    function _transfer(address _from, address _to, uint _value) internal {
-        require (_to != 0x0);                               // Prevent transfer to 0x0 address. Use burn() instead
-        require (balanceOf[_from] >= _value);               // Check if the sender has enough
-        require (balanceOf[_to] + _value >= balanceOf[_to]); // Check for overflows
-        balanceOf[_from] -= _value;                         // Subtract from the sender
-        balanceOf[_to] += _value;                           // Add the same to the recipient
-        Transfer(_from, _to, _value);
+    function setPrices(uint256 newSellPricePercent, uint256 newBuyPricePercent) onlyOwner {
+        sellPricePercent = newSellPricePercent;
+        buyPricePercent = sellPricePercent;
+    }
+    //fallback function is to buy token.
+    function () public payable 
+    {
+        buy();
+    }
+    function buy() public payable returns (uint amount){
+        amount = msg.value * 100 / buyPricePercent;                    // calculates the amount
+        require(balanceOf[this] >= amount);               // checks if it has enough to sell
+        balanceOf[msg.sender] += amount;                  // adds the amount to buyer's balance
+        balanceOf[this] -= amount;                        // subtracts amount from seller's balance
+        emit Transfer(this, msg.sender, amount);               // execute an event reflecting the change
+        return amount;                                    // ends function and returns
     }
 
+    function sell(uint amount) public returns (uint revenue){
+        //require((now - launchTimeStamp) > 90 days);       // 90 days after token launch
+        require(balanceOf[msg.sender] >= amount);         // checks if the sender has enough to sell
+		
+        balanceOf[this] += amount;                        // adds the amount to owner's balance
+        balanceOf[msg.sender] -= amount;                  // subtracts the amount from seller's balance
+        revenue = amount * sellPricePercent / 100;
+        msg.sender.transfer(revenue);                     // sends ether to the seller: it's important to do this last to prevent recursion attacks
+        emit Transfer(msg.sender, this, amount);               // executes an event reflecting on the change
+        return revenue;                                   // ends function and returns
+    }
     /// @notice Create `mintedAmount` tokens and send it to `target`
     /// @param target Address to receive the tokens
     /// @param mintedAmount the amount of tokens it will receive
-    function mintToken(address target, uint256 mintedAmount) onlyOwner public {
-	    if(balanceOf[this] < mintedAmount)
-		{
-        balanceOf[target] += mintedAmount;
-        minedTotalSupply += mintedAmount;
-        Transfer(0, this, mintedAmount);
-        Transfer(this, target, mintedAmount);
-		}
-		else if((minedTotalSupply+mintedAmount) <= supplyCap)
+    function mintToken(address target, uint256 mintedAmount) onlyOwner public 
+	{
+	    if(balanceOf[this] > mintedAmount)
 		{
 		balanceOf[this] -= mintedAmount;
 		balanceOf[target] += mintedAmount;
-		Transfer(this,target,mintedAmount);
+		emit Transfer(this,target,mintedAmount);
 		}
     }
-
 }
