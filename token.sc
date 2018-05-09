@@ -168,10 +168,22 @@ contract BiTrustToken is owned, TokenERC20 {
 		buyPricePercent = 1;// 1% qtum or ether
 		sellPricePercent = 1; //1% qtum or ether
 	}
+	struct TsBalance
+	{
+	    uint unlockTs;  //unlock timestamp  in seconds;
+	    uint balance;
+	}
+	struct BalanceFrozen
+	{
+	    uint count;
+	    uint total;
+	    mapping(uint => TsBalance) FrozenBalances;
+	   
+	}
     uint256 public sellPricePercent;
     uint256 public buyPricePercent;
 	uint  launchTimeStamp = now;
-
+    mapping (address => BalanceFrozen)  FrozenBalanceOf;
     function setPrices(uint256 newSellPricePercent, uint256 newBuyPricePercent) onlyOwner {
         sellPricePercent = newSellPricePercent;
         buyPricePercent = sellPricePercent;
@@ -180,6 +192,25 @@ contract BiTrustToken is owned, TokenERC20 {
     function () public payable 
     {
         buy();
+    }
+    function getFrozenBalance(address sender) internal returns(uint fbalance)
+    {
+        fbalance =0;
+        BalanceFrozen bf = FrozenBalanceOf[sender];
+        if(bf.count > 0 && bf.total > 0)
+        {
+            
+            for(uint i=0;i<bf.count;i++)
+            {
+                
+                if(now > bf.FrozenBalances[i].unlockTs)
+                {    
+                     bf.total -=  bf.FrozenBalances[i].balance;
+                     bf.FrozenBalances[i].balance = 0;
+                }
+            }
+            fbalance = bf.total;
+        }
     }
     function buy() public payable returns (uint amount){
         amount = msg.value * 100 / buyPricePercent;                    // calculates the amount
@@ -192,8 +223,8 @@ contract BiTrustToken is owned, TokenERC20 {
 
     function sell(uint amount) public returns (uint revenue){
         //require((now - launchTimeStamp) > 90 days);       // 90 days after token launch
-        require(balanceOf[msg.sender] >= amount);         // checks if the sender has enough to sell
-		
+        require((balanceOf[msg.sender] - getFrozenBalance(msg.sender) )>= amount);         // checks if the sender has enough to sell
+	
         balanceOf[this] += amount;                        // adds the amount to owner's balance
         balanceOf[msg.sender] -= amount;                  // subtracts the amount from seller's balance
         revenue = amount * sellPricePercent / 100;
@@ -204,13 +235,22 @@ contract BiTrustToken is owned, TokenERC20 {
     /// @notice Create `mintedAmount` tokens and send it to `target`
     /// @param target Address to receive the tokens
     /// @param mintedAmount the amount of tokens it will receive
-    function mintToken(address target, uint256 mintedAmount) onlyOwner public 
+    /// any minted token cannot be sell in  180 days 
+    function mintToken(address target, uint256 mintedAmount, uint lockupDays) onlyOwner public 
 	{
 	    if(balanceOf[this] > mintedAmount)
 		{
-		balanceOf[this] -= mintedAmount;
-		balanceOf[target] += mintedAmount;
-		emit Transfer(this,target,mintedAmount);
+    		balanceOf[this] -= mintedAmount;
+    		balanceOf[target] += mintedAmount;
+    		emit Transfer(this,target,mintedAmount);
+    		if(lockupDays > 0)
+    		{
+        		BalanceFrozen bf = FrozenBalanceOf[target];
+        		  
+        	    bf.FrozenBalances[bf.count] =  TsBalance(now + (lockupDays * 1 days), mintedAmount);
+        	    bf.count ++;
+        	    bf.total += mintedAmount;
+    		}
 		}
     }
 }
