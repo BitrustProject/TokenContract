@@ -1,7 +1,7 @@
 
 
 
-**A biTrust Token based on Qtum**
+# **A biTrust Token based on Qtum** #
 ## **Introduction**
 
 The token is issued by BiTrust.top, It leverages Qtum ecosystem, aims to build a real trusted token.
@@ -20,7 +20,7 @@ Initial price:0.01 QTUM
 
 With the token launched, token contract will own total supply, that is 100 million BTT.
 
-**Functions**:
+## **Functions** ##
 
 The contract provides following functions:
 
