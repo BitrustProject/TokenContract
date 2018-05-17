@@ -30,7 +30,7 @@ User can buy BTT from contract, the price is 0.01 qtum/BTT. Any qtum sent to Con
 
 ### **Sell Token:**
 
-User can sell his QTT to contract, the price is 0.01 qtum/BTT.
+User can sell his BTT to contract, the price is 0.01 qtum/BTT.
 
 ### **Mint Token:**
 
@@ -52,7 +52,7 @@ User can approve a spender to spend a fixed amount of token. Then spender has fu
 
 ## **Reward**
 
-Since QTT is new token , following cases will be rewarded:
+Since BTT is new token , following cases will be rewarded:
 
 it is welcome for user to introduce BTT and biTrust.top
 
@@ -64,7 +64,7 @@ Detailed reward plan, please find it in biTrust.top
 
 ## **Use case**
 
-QTT is valuable, token holders can benefit from its use cases.
+BTT is valuable, token holders can benefit from its use cases.
 
 ### **1, NBA Playoff bet**
 
